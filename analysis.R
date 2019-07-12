@@ -1,11 +1,26 @@
 ﻿
+
+# 套件匯入更新與判斷
 # install.packages("broom")
 # install.packages("mFilter")
-library("broom")
-library("mFilter")
 
-tde =c(
-	99066.1,		# 2000
+use.package = function(){
+	# install package name
+	pkgs = c("broom", "mFilter")
+	key = pkgs[!( pkgs %in% installed.packages()[,"Package"] )]
+	if(length(key)) {
+		install.packages(pkgs)
+	}
+	library("broom")
+	library("mFilter")
+}
+
+use.package()
+
+# Test Data
+
+tde = c(
+	99066.1,	# 2000
 	109276.2,	# 2001
 	120480.4,	# 2002
 	136576.3,	# 2003
@@ -23,9 +38,9 @@ tde =c(
 	683390.5,	# 2015
 	737074,		# 2016
 	820099.5,	# 2017
-	896915.6		# 2018
+	896915.6	# 2018
 )
-tdo =c(
+tdo = c(
 	109276.2,	# 2001
 	120480.4,	# 2002
 	136576.3,	# 2003
@@ -43,20 +58,40 @@ tdo =c(
 	683390.5,	# 2015
 	737074,		# 2016
 	820099.5,	# 2017
-	896915.6		# 2018
+	896915.6	# 2018
 )
+
 ts.tdo = ts(tdo, frequency = 1, start = c(2001, 1) )
 ts.tde = ts(tde, frequency = 1, start = c(2000, 1) )
 
+# 敘述統計 -> minimum , q1, median, mean, q3, maximum, na, sd, var, range.
+
 sumy = function(su.data){
+	tem.su.all = data.frame(
+		minimum = numeric(), q1 = numeric(), median = numeric(), 
+		mean = numeric(), q3 = numeric(), maximum = numeric(), 
+		na = numeric(), sd = numeric(), var = numeric(), range = numeric()
+	)
 	tem.sumy = summary( su.data, na.rm = TRUE)
 	assign( "sd", sd(su.data, na.rm = TRUE))
 	assign( "var", var(su.data, na.rm = TRUE))
 	assign( "range", range( su.data, na.rm = TRUE)[2]-range( su.data, na.rm = TRUE)[1])
+	assign( "na", c(0))
 	tem.su.df = tidy(tem.sumy)
-	tem.su.all = cbind( tem.su.df, sd,var, range)
-	tem.su.all
+	if ( length(grep("na",names(tem.su.df)))>0){
+		tem.su.df = cbind( tem.su.df, sd, var, range)
+		tem.su.all = tem.su.df
+	} else {
+		tem.su.df = cbind( tem.su.df, na, sd, var, range)
+		tem.su.all = tem.su.df
+	}
+	return(tem.su.all)
 }
+
+# EX
+# sumy(ts.tde)
+
+# 5 種濾波法處理與 TR 法判斷
 
 filter.fiv = function(data, obj.env = TRUE){
 	if (is.ts(data)){
@@ -65,7 +100,7 @@ filter.fiv = function(data, obj.env = TRUE){
 			tem.fiv.su.vna.fne = c( "HP","BK","CF","BW","TR")
 			for(i in c(1:5)){
 				tem.na = "tem.ts"
-				tem.ts.filter = mFilter( data, filter=tem.fiv.su.vna.fne[i]) 
+				tem.ts.filter = mFilter( data, filter = tem.fiv.su.vna.fne[i]) 
 				tem.na.all = paste0(tem.na,".", tem.fiv.su.vna.even[i])
 				if (obj.env == TRUE){
 					assign( tem.na.all , tem.ts.filter , env = .GlobalEnv)
@@ -74,11 +109,11 @@ filter.fiv = function(data, obj.env = TRUE){
 				}
 			}
 			if (obj.env == FALSE){
-				tem.list = list(filter.hp=tem.ts.hp,
-					filter.bk=tem.ts.bk,
-					filter.cf=tem.ts.cf,
-					filter.bw=tem.ts.bw,
-					filter.tr=tem.ts.tr)
+				tem.list = list(filter.hp = tem.ts.hp,
+					filter.bk = tem.ts.bk,
+					filter.cf = tem.ts.cf,
+					filter.bw = tem.ts.bw,
+					filter.tr = tem.ts.tr)
 			}
 		} else {
 			tem.fiv.su.vna.odd = c( "hp","bk","cf","bw")
@@ -94,10 +129,10 @@ filter.fiv = function(data, obj.env = TRUE){
 				}
 			}
 			if (obj.env == FALSE){
-				tem.list = list(filter.hp=tem.ts.hp,
-					filter.bk=tem.ts.bk,
-					filter.cf=tem.ts.cf,
-					filter.bw=tem.ts.bw)
+				tem.list = list(filter.hp = tem.ts.hp,
+					filter.bk = tem.ts.bk,
+					filter.cf = tem.ts.cf,
+					filter.bw = tem.ts.bw)
 			}
 		}
 		if (obj.env == FALSE){
@@ -108,30 +143,66 @@ filter.fiv = function(data, obj.env = TRUE){
 	}
 }
 
+# EX
 # filter.fiv(ts.tdo)
 # filter.fiv(ts.tde)
-# filter.fiv(ts.tdo,FALSE)
-# filter.fiv(ts.tde,TRUE)
+# filter.fiv(ts.tdo, FALSE)
+# filter.fiv(ts.tde, TRUE)
 
+# 濾波法敘述統計
 
-filter.fiv.su = function(data){
-	filter.fiv(data,TRUE)
-	tem = filter.fiv(data,FALSE)
-	tem.list.na.va = names(tem)
-	tem.list.na.nu = length(tem.list.na.va)
-
-	for(i in tem.list.na.nu){
-		num= tem.list.na.va[i]
-		comds = paste0( "tem$",num ,"$cycle")
-		evalp = eval(parse(text = comds))
-		print(summary(evalp))
-		#assign( k,
-		#        evalp
-		#    , env = .GlobalEnv)
+filter.fiv.su = function(data, scientific.notation = FALSE){
+	if (scientific.notation == TRUE){
+		options(scipen = 999)
+	} else if (scientific.notation == FALSE){
+		options(scipen = 0)
 	}
+	filter.fiv(data, TRUE)
+	tem = filter.fiv(data, FALSE)
+	tem.list.na.va = names(tem)
+	tem.df = data.frame( 
+			Filter = character(), Cycle = character(),
+			minimum = numeric(), q1 = numeric(), median = numeric(), 
+			mean = numeric(), q3 = numeric(), maximum = numeric(), 
+			na = numeric(), sd = numeric(), var = numeric(), range = numeric())
+	for( i in length(tem.list.na.va):1){
+		Filter = as.character(tem.list.na.va[i])
+		Class = as.character(c("Cycle"))
+		comds = paste0( "tem$", tem.list.na.va[i], "$cycle")
+		evalp = eval(parse(text = comds))
+		tem.su = cbind( Filter, Class, sumy(as.numeric(evalp)))
+		tem.df = rbind(tem.su, tem.df)
+	}
+	for( i in length(tem.list.na.va):1){
+		Filter = as.character(tem.list.na.va[i])
+		Class = as.character(c("Trend"))
+		comds = paste0( "tem$", tem.list.na.va[i], "$trend")
+		evalp = eval(parse(text = comds))
+		tem.su = cbind(Filter, Class, sumy(as.numeric(evalp)))
+		tem.df = rbind(tem.su, tem.df)
+	}
+	return(tem.df)
+	options(scipen = 0)
 }
-filter.fiv.su(ts.tdo)
 
+# EX
+# filter.fiv.su(ts.tdo, TRUE)
+# filter.fiv.su(ts.tdo)
+
+# 自動繪圖
+
+filter.plot = function( data, main.name) {
+
+}
+
+# 表格自動輸出至工作目錄
+
+# 繪圖自動輸出至工作目錄
+
+# 中國經濟分析 ALL
+
+
+######
 
 # 時間序列 PIC
 par(mfrow=c(1,1))
@@ -139,48 +210,7 @@ plot(cn.gdp.1y.ts)
 
 
 # 檔科學記號
-options(scipen=999)
-
-# HP
-cn.gdp.1y.ts.hp.cyc = cn.gdp.1y.ts.hp[["cycle"]]
-summary(cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)
-sd(cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)
-var(cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)
-quantile(cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)
-range( cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)[2]-range( cn.gdp.1y.ts.hp.cyc, na.rm = TRUE)[1]
-
-# BK
-cn.gdp.1y.ts.bk.cyc = cn.gdp.1y.ts.bk[["cycle"]]
-summary(cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)
-sd(cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)
-var(cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)
-quantile(cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)
-range( cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)[2]-range( cn.gdp.1y.ts.bk.cyc, na.rm = TRUE)[1]
-
-# CF
-cn.gdp.1y.ts.cf.cyc = cn.gdp.1y.ts.cf[["cycle"]]
-summary(cn.gdp.1y.ts.cf.cyc, na.rm = TRUE)
-sd(cn.gdp.1y.ts.cf.cyc, na.rm = TRUE)
-var(cn.gdp.1y.ts.cf.cyc, na.rm = TRUE)
-quantile(ccn.gdp.1y.ts.cf.cyc, na.rm = TRUE)
-range( cn.gdp.1y.ts.cf.cyc, na.rm = TRUE)[2]-range( cn.gdp.1y.ts.cf.cyc, na.rm = TRUE)[1]
-
-# BW
-cn.gdp.1y.ts.bw.cyc = cn.gdp.1y.ts.bw[["cycle"]]
-summary(cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)
-sd(cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)
-var(cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)
-quantile(cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)
-range( cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)[2]-range( cn.gdp.1y.ts.bw.cyc, na.rm = TRUE)[1]
-
-# TR
-cn.gdp.1y.ts.tr.cyc = cn.gdp.1y.ts.tr[["cycle"]]
-summary(cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)
-sd(cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)
-var(cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)
-quantile(cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)
-range( cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)[2]-range( cn.gdp.1y.ts.tr.cyc, na.rm = TRUE)[1]
-
+# options(scipen=999)
 
 opar <- par(no.readonly=TRUE)
 par(mfrow=c(1,1),mar=c(3,3,2,1))
